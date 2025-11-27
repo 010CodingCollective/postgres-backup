@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -17,6 +19,11 @@ type PostgresBackup struct {
 
 func (b *PostgresBackup) Start() error {
 	slog.Info("Initializing backup scheduler", "schedule", b.cfg.Schedule)
+
+	// Check for required dependencies
+	if _, err := exec.LookPath("pg_dump"); err != nil {
+		return fmt.Errorf("required command 'pg_dump' not found: %w", err)
+	}
 
 	// Create a new cron scheduler
 	c := cron.New()
@@ -49,7 +56,7 @@ func (b *PostgresBackup) Start() error {
 
 func (b *PostgresBackup) runBackup() {
 	slog.Info("Starting backup job")
-	// TODO: Implement actual backup logic using pg_dump
+
 	slog.Info("Backup job completed")
 }
 

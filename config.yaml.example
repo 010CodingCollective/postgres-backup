@@ -23,3 +23,31 @@ postgres_password: password
 #   --clean --if-exists - Add DROP commands before CREATE
 #   --no-owner --no-acl - Exclude owner and ACL information
 postgres_extra_opts: '--schema=public --blobs'
+
+# S3 Storage Configuration
+# Supports AWS S3 and S3-compatible services (MinIO, DigitalOcean Spaces, Cloudflare R2, etc.)
+s3:
+  # Custom endpoint for S3-compatible services
+  # Leave empty for AWS S3
+  # Examples:
+  #   MinIO: https://minio.example.com
+  #   DigitalOcean Spaces: https://nyc3.digitaloceanspaces.com
+  #   Cloudflare R2: https://<account_id>.r2.cloudflarestorage.com
+  endpoint: ''
+
+  # AWS region (required for AWS S3, can be any string for S3-compatible services)
+  region: 'us-east-1'
+
+  # S3 bucket name
+  bucket: 'pg-backups'
+
+  # Access credentials
+  # It's recommended to use environment variables for sensitive data:
+  #   S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY
+  access_key_id: ''
+  secret_access_key: ''
+
+  # Use path-style addressing instead of virtual-hosted style
+  # Set to true for most S3-compatible services (MinIO, Cloudflare R2, Backblaze B2, Wasabi)
+  # Set to false for AWS S3 and DigitalOcean Spaces
+  use_path_style: false
