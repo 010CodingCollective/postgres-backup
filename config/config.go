@@ -24,12 +24,16 @@ type S3Config struct {
 
 // Config holds all configuration for the pg-backup application
 type Config struct {
-	Schedule          string   `koanf:"schedule" yaml:"schedule"`
-	PostgresDatabase  string   `koanf:"postgres_database" yaml:"postgres_database"`
-	PostgresUser      string   `koanf:"postgres_user" yaml:"postgres_user"`
-	PostgresPassword  string   `koanf:"postgres_password" yaml:"postgres_password"`
-	PostgresExtraOpts string   `koanf:"postgres_extra_opts" yaml:"postgres_extra_opts"`
-	S3                S3Config `koanf:"s3" yaml:"s3"`
+	Schedule          string `koanf:"schedule" yaml:"schedule"`
+	PostgresDatabase  string `koanf:"postgres_database" yaml:"postgres_database"`
+	PostgresUser      string `koanf:"postgres_user" yaml:"postgres_user"`
+	PostgresPassword  string `koanf:"postgres_password" yaml:"postgres_password"`
+	PostgresHost      string `koanf:"postgres_host" yaml:"postgres_host"`
+	PostgresPort      string `koanf:"postgres_port" yaml:"postgres_port"`
+	PostgresExtraOpts string `koanf:"postgres_extra_opts" yaml:"postgres_extra_opts"`
+	// RunAtStartup triggers an immediate backup run when the application starts
+	RunAtStartup bool     `koanf:"run_at_startup" yaml:"run_at_startup"`
+	S3           S3Config `koanf:"s3" yaml:"s3"`
 }
 
 // LoadConfig loads configuration from YAML file and environment variables
@@ -43,7 +47,10 @@ func LoadConfig(configPath string) (*Config, error) {
 		"postgres_database":   "dbname",
 		"postgres_user":       "user",
 		"postgres_password":   "password",
+		"postgres_host":       "localhost",
+		"postgres_port":       "5432",
 		"postgres_extra_opts": "--schema=public --blobs",
+		"run_at_startup":      false,
 	}
 
 	if err := k.Load(confmap.Provider(defaults, "."), nil); err != nil {

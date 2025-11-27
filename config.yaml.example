@@ -8,8 +8,16 @@
 #   0 2 * * * - Run at 2:00 AM every day
 schedule: '@daily'
 
+# Run a backup immediately when the application starts (in addition to the schedule)
+# Set to true to trigger an immediate backup run on startup
+run_at_startup: false
+
 # PostgreSQL database name
 postgres_database: dbname
+
+# PostgreSQL host and port
+postgres_host: localhost
+postgres_port: "5432"
 
 # PostgreSQL username
 postgres_user: user
