@@ -1,0 +1,25 @@
+# PostgreSQL Backup Configuration
+# Copy this file to config.yaml and adjust the values as needed
+
+# Backup schedule in cron format
+# Examples:
+#   @daily - Run once a day at midnight
+#   @hourly - Run once an hour
+#   0 2 * * * - Run at 2:00 AM every day
+schedule: '@daily'
+
+# PostgreSQL database name
+postgres_database: dbname
+
+# PostgreSQL username
+postgres_user: user
+
+# PostgreSQL password
+postgres_password: password
+
+# Additional options for pg_dump
+# Common options:
+#   --schema=public --blobs - Backup only the public schema with binary data
+#   --clean --if-exists - Add DROP commands before CREATE
+#   --no-owner --no-acl - Exclude owner and ACL information
+postgres_extra_opts: '--schema=public --blobs'
