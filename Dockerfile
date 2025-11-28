@@ -2,7 +2,7 @@
 # Runtime image includes pg_dump so the app can perform backups.
 
 # ---------- Build stage ----------
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 WORKDIR /src
 
 # Install build deps
