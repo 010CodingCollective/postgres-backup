@@ -21,7 +21,11 @@ func main() {
 	}
 
 	slog.Debug("Configuration loaded", "data", cfg)
-	backupper := newPostgresBackup(cfg)
+	backupper, err := newPostgresBackup(cfg)
+	if err != nil {
+		slog.Error("error initializing backup service: ", err)
+		os.Exit(1)
+	}
 	err = backupper.Start()
 	if err != nil {
 		slog.Error("error while backupping: ", err)
