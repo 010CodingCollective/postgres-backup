@@ -1,0 +1,90 @@
+name: Build Container Image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install buildah
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y buildah
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | buildah login -u ${{ github.actor }} --password-stdin ${{ env.REGISTRY }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        run: |
+          # Lowercase the image name
+          IMAGE_NAME_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$IMAGE_NAME_LOWER" >> $GITHUB_OUTPUT
+
+          # Generate tags based on event type
+          TAGS=""
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Main branch: tag as latest and commit SHA
+            TAGS="$IMAGE_NAME_LOWER:latest,$IMAGE_NAME_LOWER:${{ github.sha }}"
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # Tag event: use the tag name and latest
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            TAGS="$IMAGE_NAME_LOWER:$TAG_NAME,$IMAGE_NAME_LOWER:latest"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # PR: just use PR number for testing
+            TAGS="$IMAGE_NAME_LOWER:pr-${{ github.event.pull_request.number }}"
+          fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+      - name: Build container image with buildah
+        id: build
+        run: |
+          IFS=',' read -ra TAG_ARRAY <<< "${{ steps.meta.outputs.tags }}"
+
+          # Build the image with the first tag
+          buildah bud -f Dockerfile -t "${TAG_ARRAY[0]}" .
+
+          # Tag with additional tags
+          for tag in "${TAG_ARRAY[@]:1}"; do
+            buildah tag "${TAG_ARRAY[0]}" "$tag"
+          done
+
+          echo "Built and tagged image with: ${{ steps.meta.outputs.tags }}"
+
+      - name: Push container image
+        if: github.event_name != 'pull_request'
+        run: |
+          IFS=',' read -ra TAG_ARRAY <<< "${{ steps.meta.outputs.tags }}"
+
+          # Push all tags
+          for tag in "${TAG_ARRAY[@]}"; do
+            echo "Pushing $tag"
+            buildah push "$tag"
+          done
+
+      - name: Image digest
+        if: github.event_name != 'pull_request'
+        run: |
+          IFS=',' read -ra TAG_ARRAY <<< "${{ steps.meta.outputs.tags }}"
+          buildah inspect "${TAG_ARRAY[0]}" | grep -i digest || true
