@@ -192,7 +192,8 @@ func (b *PostgresBackup) doPostgresBackup() (string, error) {
 		}
 	}(gzipWriter)
 
-	cmd.Stdout = gzipWriter
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
@@ -203,7 +204,7 @@ func (b *PostgresBackup) doPostgresBackup() (string, error) {
 	if err = cmd.Run(); err != nil {
 		// Remove partial file on failure
 		_ = os.Remove(outfile)
-		slog.Error("Failed to execute pg_dump with compression", "error", err, "output", stderr)
+		slog.Error("Failed to execute pg_dump", "error", err, "stderr", stderr.String(), "stdout", stdout.String())
 		err = fmt.Errorf("pg_dump failed %w", err)
 		return "", err
 	}
@@ -214,6 +215,12 @@ func newPostgresBackup(cfg *config.Config) (*PostgresBackup, error) {
 	pb := &PostgresBackup{
 		cfg:     cfg,
 		tempDir: "/tmp",
+	}
+
+	// Check that the temp directory exists
+	_, err := os.Stat(pb.tempDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to access temp directory: %w", err)
 	}
 
 	// Initialize S3 client if S3 is configured
