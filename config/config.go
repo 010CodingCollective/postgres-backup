@@ -68,10 +68,16 @@ func LoadConfig(configPath string) (*Config, error) {
 
 	// Load from environment variables (highest priority)
 	// Environment variables should be in uppercase (e.g., SCHEDULE, POSTGRES_DATABASE)
+	// For nested structs, use underscore as delimiter (e.g., S3_SECRET_ACCESS_KEY -> s3.secret_access_key)
 	if err := k.Load(env.Provider("", ".", func(s string) string {
-		// Convert environment variable names to lowercase with underscores
-		// POSTGRES_DATABASE -> postgres_database
-		return strings.ToLower(s)
+		// Convert to lowercase
+		s = strings.ToLower(s)
+		// Replace first underscore after "s3" with dot for nested struct mapping
+		// s3_secret_access_key -> s3.secret_access_key
+		if strings.HasPrefix(s, "s3_") {
+			return strings.Replace(s, "s3_", "s3.", 1)
+		}
+		return s
 	}), nil); err != nil {
 		return nil, fmt.Errorf("error loading environment variables: %w", err)
 	}
