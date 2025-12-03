@@ -19,12 +19,12 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/pg-backup ./
 
 # ---------- Runtime stage ----------
-FROM alpine:3.20
+FROM alpine:3.22
 
 WORKDIR /app
 
 # pg_dump is required at runtime; also install certificates and tzdata
-RUN apk add --no-cache postgresql-client ca-certificates tzdata
+RUN apk add --no-cache postgresql17-client ca-certificates tzdata
 
 # Copy app binary
 COPY --from=builder /out/pg-backup /usr/local/bin/pg-backup
