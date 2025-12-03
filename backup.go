@@ -163,14 +163,9 @@ func (b *PostgresBackup) doPostgresBackup() (string, error) {
 		args = append(args, b.cfg.PostgresDatabase)
 	}
 
-	// Prepare command
-	cmd := exec.Command("pg_dump", args...)
-	// Pass password via environment variable
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", b.cfg.PostgresPassword))
-
 	// Dump to a timestamped file in the temp directory
 	ts := time.Now().Format("20060102-150405")
-	outfile := fmt.Sprintf("%s/%s-backup-%s.sql.gz", b.tempDir, b.cfg.PostgresDatabase, ts)
+	outfile := fmt.Sprintf("%s/%s-backup-%s.sql", b.tempDir, b.cfg.PostgresDatabase, ts)
 	f, err := os.Create(outfile)
 	if err != nil {
 		slog.Error("Failed to create dump file", "file", outfile, "error", err)
@@ -182,6 +177,12 @@ func (b *PostgresBackup) doPostgresBackup() (string, error) {
 			slog.Error("Failed to close dump file", "file", outfile, "error", err)
 		}
 	}(f)
+	args = append(args, "-f", outfile)
+
+	// Prepare command
+	cmd := exec.Command("pg_dump", args...)
+	// Pass password via environment variable
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", b.cfg.PostgresPassword))
 
 	// Create gzip writer for compression
 	gzipWriter := gzip.NewWriter(f)
