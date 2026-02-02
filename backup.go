@@ -163,52 +163,50 @@ func (b *PostgresBackup) doPostgresBackup() (string, error) {
 		args = append(args, b.cfg.PostgresDatabase)
 	}
 
-	// Dump to a timestamped file in the temp directory
+	// Dump to a timestamped gzip file in the temp directory
 	ts := time.Now().Format("20060102-150405")
-	outfile := fmt.Sprintf("%s/%s-backup-%s.sql", b.tempDir, b.cfg.PostgresDatabase, ts)
+	outfile := fmt.Sprintf("%s/%s-backup-%s.sql.gz", b.tempDir, b.cfg.PostgresDatabase, ts)
+
 	f, err := os.Create(outfile)
 	if err != nil {
 		slog.Error("Failed to create dump file", "file", outfile, "error", err)
 		return "", err
 	}
-	defer func(f *os.File) {
-		err = f.Close()
-		if err != nil {
-			slog.Error("Failed to close dump file", "file", outfile, "error", err)
+
+	// Create gzip writer for compression (pg_dump stdout -> gzip -> file)
+	gzipWriter := gzip.NewWriter(f)
+	defer func() {
+		// Close gzip first to flush its footer/trailer into the underlying file
+		if cerr := gzipWriter.Close(); cerr != nil {
+			slog.Error("Failed to close gzip writer", "file", outfile, "error", cerr)
 		}
-	}(f)
-	args = append(args, "-f", outfile)
+		if cerr := f.Close(); cerr != nil {
+			slog.Error("Failed to close dump file", "file", outfile, "error", cerr)
+		}
+	}()
 
 	// Prepare command
 	cmd := exec.Command("pg_dump", args...)
 	// Pass password via environment variable
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", b.cfg.PostgresPassword))
 
-	// Create gzip writer for compression
-	gzipWriter := gzip.NewWriter(f)
-	defer func(gzipWriter *gzip.Writer) {
-		err = gzipWriter.Close()
-		if err != nil {
-			slog.Error("Failed to close gzip writer", "file", outfile, "error", err)
-		}
-	}(gzipWriter)
+	// Stream pg_dump directly into gzip (Solution A)
+	cmd.Stdout = gzipWriter
 
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	// Redact sensitive data in logs
 	logArgs := strings.Join(args, " ")
-	slog.Info("Executing pg_dump with compression", "args", logArgs, "output", outfile)
+	slog.Info("Executing pg_dump with compression", "args", logArgs, "output", filepath.Base(outfile))
 
 	if err = cmd.Run(); err != nil {
 		// Remove partial file on failure
 		_ = os.Remove(outfile)
-		slog.Error("Failed to execute pg_dump", "error", err, "stderr", stderr.String(), "stdout", stdout.String())
-		err = fmt.Errorf("pg_dump failed %w", err)
-		return "", err
+		slog.Error("Failed to execute pg_dump", "error", err, "stderr", stderr.String())
+		return "", fmt.Errorf("pg_dump failed %w", err)
 	}
+
 	return outfile, nil
 }
 
