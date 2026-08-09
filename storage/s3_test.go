@@ -87,3 +87,50 @@ func TestUploadSetsStorageClassHeader(t *testing.T) {
 		})
 	}
 }
+
+// TestFileExists checks that only a genuine 404 is reported as absent. Any other
+// failure must surface as an error rather than being mistaken for a missing object.
+func TestFileExists(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		want    bool
+		wantErr bool
+	}{
+		{name: "object present", status: http.StatusOK, want: true},
+		{name: "object absent", status: http.StatusNotFound, want: false},
+		{name: "access denied is an error", status: http.StatusForbidden, want: false, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+			}))
+			defer srv.Close()
+
+			client, err := NewS3Client(context.Background(), S3Config{
+				Endpoint:        srv.URL,
+				Region:          "nl-ams",
+				Bucket:          "test-bucket",
+				AccessKeyID:     "key",
+				SecretAccessKey: "secret",
+				UsePathStyle:    true,
+			})
+			if err != nil {
+				t.Fatalf("NewS3Client returned unexpected error: %v", err)
+			}
+
+			got, err := client.FileExists(context.Background(), "backup.sql.gz")
+			if tt.wantErr && err == nil {
+				t.Fatalf("FileExists on HTTP %d returned no error, want one", tt.status)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("FileExists on HTTP %d returned unexpected error: %v", tt.status, err)
+			}
+			if got != tt.want {
+				t.Errorf("FileExists on HTTP %d = %v, want %v", tt.status, got, tt.want)
+			}
+		})
+	}
+}

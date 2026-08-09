@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -183,8 +184,15 @@ func (c *S3Client) FileExists(ctx context.Context, key string) (bool, error) {
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		// Check if it's a "not found" error
-		return false, nil
+		var notFound *types.NotFound
+		if errors.As(err, &notFound) {
+			return false, nil
+		}
+		// Everything else (denied access, throttling, network failure) is reported
+		// rather than reduced to "absent", so a broken policy cannot be mistaken for
+		// a missing backup. Note that a provider may answer 403 instead of 404 for an
+		// object that does not exist when the caller lacks s3:ListBucket.
+		return false, fmt.Errorf("failed to check if file exists in S3: %w", err)
 	}
 	return true, nil
 }
