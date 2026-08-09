@@ -59,6 +59,7 @@ s3:
   bucket: my-backup-bucket
   access_key_id: AKIAIOSFODNN7EXAMPLE
   secret_access_key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+  prefix: backups  # Key prefix; empty uploads to the root of the bucket
   use_path_style: false  # Set to true for MinIO and most S3-compatible services
   storage_class: ""  # Leave empty for the provider default; see Storage Classes below
 ```
@@ -79,6 +80,7 @@ POSTGRES_EXTRA_OPTS="--schema=public --blobs"
 S3_ENDPOINT=""
 S3_REGION="us-east-1"
 S3_BUCKET="my-backup-bucket"
+S3_PREFIX="backups"
 S3_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
 S3_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 S3_USE_PATH_STYLE="false"
@@ -101,10 +103,14 @@ The `schedule` field uses cron format. Common examples:
 Backups are stored in S3 with the following structure:
 
 ```
-s3://your-bucket/backups/{database}-backup-{timestamp}.sql.gz
+s3://your-bucket/{prefix}/{database}-backup-{timestamp}.sql.gz
 ```
 
 Example: `backups/mydb-backup-20250128-020000.sql.gz`
+
+The prefix defaults to `backups` and is set with `prefix` (or `S3_PREFIX`). Leading and trailing
+slashes are ignored, nested prefixes such as `prod/mydb` work, and an empty prefix uploads to the
+root of the bucket. This is the knob to use when several databases or environments share a bucket.
 
 ## Storage Classes
 

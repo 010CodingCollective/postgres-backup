@@ -55,6 +55,12 @@ s3:
   access_key_id: ''
   secret_access_key: ''
 
+  # Key prefix applied to uploaded backups
+  # Backups are stored as {prefix}/{database}-backup-{timestamp}.sql.gz
+  # Set to an empty string to upload to the root of the bucket
+  # Useful for sharing one bucket across databases or environments, e.g. 'prod/mydb'
+  prefix: 'backups'
+
   # Use path-style addressing instead of virtual-hosted style
   # Set to true for most S3-compatible services (MinIO, Cloudflare R2, Backblaze B2, Wasabi)
   # Set to false for AWS S3 and DigitalOcean Spaces
