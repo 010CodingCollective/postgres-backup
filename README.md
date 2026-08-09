@@ -60,6 +60,7 @@ s3:
   access_key_id: AKIAIOSFODNN7EXAMPLE
   secret_access_key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
   use_path_style: false  # Set to true for MinIO and most S3-compatible services
+  storage_class: ""  # Leave empty for the provider default; see Storage Classes below
 ```
 
 ### Environment Variables
@@ -81,6 +82,7 @@ S3_BUCKET="my-backup-bucket"
 S3_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
 S3_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 S3_USE_PATH_STYLE="false"
+S3_STORAGE_CLASS=""
 ```
 
 ## Schedule Format
@@ -103,6 +105,57 @@ s3://your-bucket/backups/{database}-backup-{timestamp}.sql.gz
 ```
 
 Example: `backups/mydb-backup-20250128-020000.sql.gz`
+
+## Storage Classes
+
+By default no storage class is sent, so the provider applies its own default (`STANDARD` almost
+everywhere). Set `storage_class` to override it:
+
+```yaml
+s3:
+  storage_class: GLACIER
+```
+
+The value is case-insensitive and validated at startup, so a typo fails immediately rather than
+at the first scheduled backup. Accepted values are the standard S3 classes — `STANDARD`,
+`STANDARD_IA`, `ONEZONE_IA`, `INTELLIGENT_TIERING`, `GLACIER`, `GLACIER_IR`, `DEEP_ARCHIVE` and
+others. Which ones actually work depends on your provider.
+
+## Scaleway Object Storage
+
+Scaleway is S3-compatible and needs only endpoint and region configuration:
+
+```yaml
+s3:
+  endpoint: 'https://s3.nl-ams.scw.cloud'  # or s3.fr-par.scw.cloud
+  region: 'nl-ams'                         # must match the endpoint region
+  bucket: 'pg-backups'
+  use_path_style: false
+```
+
+Two constraints are worth knowing. The Glacier class exists only in the **fr-par** and **nl-ams**
+regions, not pl-waw. And bucket names must not contain a dot, because Scaleway's wildcard
+certificate `*.s3.<region>.scw.cloud` is not recursive — a dotted name breaks virtual-hosted
+addressing and forces `use_path_style: true`.
+
+### Prefer a lifecycle rule over writing straight to Glacier
+
+Setting `storage_class: GLACIER` works, but think carefully before using it for your only backup
+target. Glacier objects cannot be read with a plain download — they must be restored first, and
+Scaleway notes that for objects larger than 1 MB the restore can take anywhere from a few minutes
+to **24 hours to begin**. Every Postgres dump is larger than 1 MB, so this makes your most recent
+backup, the one you actually need during an incident, the one you cannot have for up to a day.
+Scaleway also requires objects to be stored for **90 days** before a Glacier transition, and bills
+early deletion against that minimum, so short retention plus Glacier is expensive.
+
+The recommended setup is to leave `storage_class` empty and configure a **bucket lifecycle rule**
+in the Scaleway console that transitions objects to `GLACIER` after N days. Recent backups stay
+instantly restorable, older ones get cheap automatically, and this application needs no restore
+logic at all.
+
+Direct-to-Glacier is a reasonable choice for a *secondary* archive bucket that you never expect to
+read from in a hurry. This application does not implement restore; recovering a Glacier object is a
+manual step in the Scaleway console or via `RestoreObject`.
 
 ## Building from Source
 

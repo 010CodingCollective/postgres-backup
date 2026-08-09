@@ -59,3 +59,16 @@ s3:
   # Set to true for most S3-compatible services (MinIO, Cloudflare R2, Backblaze B2, Wasabi)
   # Set to false for AWS S3 and DigitalOcean Spaces
   use_path_style: false
+
+  # Storage class applied to uploaded backups
+  # Leave empty to let the provider choose its default (STANDARD on most services)
+  # Examples:
+  #   AWS S3:   STANDARD, STANDARD_IA, GLACIER, GLACIER_IR, DEEP_ARCHIVE
+  #   Scaleway: STANDARD, ONEZONE_IA, GLACIER
+  #
+  # WARNING: objects written directly to GLACIER cannot be downloaded until they
+  # have been restored, which on Scaleway can take up to 24 hours to even begin.
+  # Prefer leaving this empty and configuring a bucket lifecycle rule that
+  # transitions older backups to GLACIER, so the most recent backup stays
+  # immediately restorable. See the Scaleway section of README.md.
+  storage_class: ''
