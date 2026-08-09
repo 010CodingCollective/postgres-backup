@@ -15,7 +15,28 @@ Infer the repo from `git remote -v` — `gh` does this automatically when run in
 
 ## Local `gh` version caveat
 
-The `gh` CLI on this machine is **v2.4.0**, which predates the `gh label` subcommand. All the commands listed above work, but anything that manages the label vocabulary itself must go through the REST API instead:
+The `gh` CLI on this machine is **v2.4.0**, and two things are broken as a result.
+
+**`gh issue view` fails outright.** It requests the `projectCards` GraphQL field, which GitHub has since removed, so every invocation errors with:
+
+```
+GraphQL: Projects (classic) is being deprecated in favor of the new Projects experience ... (repository.issue.projectCards)
+```
+
+Read issues through the REST API instead:
+
+```bash
+# Read one issue with its body and labels
+gh api repos/010CodingCollective/postgres-backup/issues/1 \
+  --jq '"#\(.number) \(.title)\nlabels: \([.labels[].name]|join(", "))\nstate: \(.state)\n\n\(.body)"'
+
+# Read its comments
+gh api repos/010CodingCollective/postgres-backup/issues/1/comments --jq '.[].body'
+```
+
+`gh issue list`, `create`, `comment`, `edit` and `close` are all unaffected and work as documented above.
+
+**`gh label` does not exist yet.** Anything managing the label vocabulary must use the REST API:
 
 ```bash
 # List labels
@@ -26,7 +47,7 @@ gh api repos/010CodingCollective/postgres-backup/labels \
   -f name="some-label" -f color="ededed" -f description="..."
 ```
 
-If `gh` is upgraded past v2.9, prefer `gh label list` / `gh label create` and delete this section.
+If `gh` is upgraded, prefer `gh issue view` and `gh label list` / `gh label create` and delete this section.
 
 ## When a skill says "publish to the issue tracker"
 
@@ -34,4 +55,4 @@ Create a GitHub issue.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh issue view <number> --comments`.
+Run the `gh api repos/.../issues/<number>` command from the caveat section above — `gh issue view` is broken on this machine's CLI version.
