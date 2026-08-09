@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // S3Config holds configuration for S3 and S3-compatible storage services
@@ -20,16 +23,37 @@ type S3Config struct {
 	AccessKeyID     string // Access key ID
 	SecretAccessKey string // Secret access key
 	UsePathStyle    bool   // Set to true for most S3-compatible services (MinIO, etc.)
+	StorageClass    string // Storage class for uploaded objects (e.g., "GLACIER"); empty uses the provider default
 }
 
 // S3Client wraps the AWS S3 client for uploading backups
 type S3Client struct {
-	client *s3.Client
-	bucket string
+	client       *s3.Client
+	bucket       string
+	storageClass types.StorageClass
+}
+
+// normalizeStorageClass upper-cases a configured storage class and checks the SDK
+// recognises it. Empty is valid and means "let the provider pick its default".
+func normalizeStorageClass(s string) (types.StorageClass, error) {
+	sc := types.StorageClass(strings.ToUpper(strings.TrimSpace(s)))
+	if sc == "" {
+		return "", nil
+	}
+	if !slices.Contains(sc.Values(), sc) {
+		return "", fmt.Errorf("unknown storage class %q, expected one of %v", s, sc.Values())
+	}
+	return sc, nil
 }
 
 // NewS3Client creates a new S3 client that works with AWS S3 and S3-compatible services
 func NewS3Client(ctx context.Context, cfg S3Config) (*S3Client, error) {
+	// Fail at startup on an invalid storage class rather than at the first upload
+	storageClass, err := normalizeStorageClass(cfg.StorageClass)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create custom credentials provider
 	creds := credentials.NewStaticCredentialsProvider(
 		cfg.AccessKeyID,
@@ -69,17 +93,19 @@ func NewS3Client(ctx context.Context, cfg S3Config) (*S3Client, error) {
 	client := s3.NewFromConfig(awsCfg, s3Opts...)
 
 	return &S3Client{
-		client: client,
-		bucket: cfg.Bucket,
+		client:       client,
+		bucket:       cfg.Bucket,
+		storageClass: storageClass,
 	}, nil
 }
 
 // UploadFile uploads a file to S3
 func (c *S3Client) UploadFile(ctx context.Context, key string, file *os.File) error {
 	_, err := c.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(c.bucket),
-		Key:    aws.String(key),
-		Body:   file,
+		Bucket:       aws.String(c.bucket),
+		Key:          aws.String(key),
+		Body:         file,
+		StorageClass: c.storageClass,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to upload file to S3: %w", err)
@@ -90,9 +116,10 @@ func (c *S3Client) UploadFile(ctx context.Context, key string, file *os.File) er
 // UploadReader uploads from an io.Reader to S3
 func (c *S3Client) UploadReader(ctx context.Context, key string, reader io.Reader) error {
 	_, err := c.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(c.bucket),
-		Key:    aws.String(key),
-		Body:   reader,
+		Bucket:       aws.String(c.bucket),
+		Key:          aws.String(key),
+		Body:         reader,
+		StorageClass: c.storageClass,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to upload to S3: %w", err)
@@ -165,4 +192,10 @@ func (c *S3Client) FileExists(ctx context.Context, key string) (bool, error) {
 // GetBucket returns the configured bucket name
 func (c *S3Client) GetBucket() string {
 	return c.bucket
+}
+
+// GetStorageClass returns the normalized storage class sent with uploads,
+// or an empty string when the provider default is used
+func (c *S3Client) GetStorageClass() string {
+	return string(c.storageClass)
 }

@@ -20,6 +20,7 @@ type S3Config struct {
 	AccessKeyID     string `koanf:"access_key_id" yaml:"access_key_id"`         // Access key ID
 	SecretAccessKey string `koanf:"secret_access_key" yaml:"secret_access_key"` // Secret access key
 	UsePathStyle    bool   `koanf:"use_path_style" yaml:"use_path_style"`       // Set to true for most S3-compatible services (MinIO, etc.)
+	StorageClass    string `koanf:"storage_class" yaml:"storage_class"`         // Storage class for uploaded objects (e.g. "GLACIER"); empty uses the provider default
 }
 
 // Config holds all configuration for the pg-backup application

@@ -231,6 +231,7 @@ func newPostgresBackup(cfg *config.Config) (*PostgresBackup, error) {
 			AccessKeyID:     cfg.S3.AccessKeyID,
 			SecretAccessKey: cfg.S3.SecretAccessKey,
 			UsePathStyle:    cfg.S3.UsePathStyle,
+			StorageClass:    cfg.S3.StorageClass,
 		}
 
 		s3Client, err := storage.NewS3Client(context.Background(), s3Cfg)
@@ -238,7 +239,7 @@ func newPostgresBackup(cfg *config.Config) (*PostgresBackup, error) {
 			return nil, fmt.Errorf("failed to initialize S3 client: %w", err)
 		}
 		pb.s3Client = s3Client
-		slog.Info("S3 client initialized", "bucket", cfg.S3.Bucket)
+		slog.Info("S3 client initialized", "bucket", cfg.S3.Bucket, "storage_class", s3Client.GetStorageClass())
 	}
 
 	return pb, nil
