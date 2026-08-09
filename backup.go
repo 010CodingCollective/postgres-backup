@@ -99,11 +99,22 @@ func (b *PostgresBackup) runBackup() {
 	slog.Info("Backup job completed successfully")
 }
 
+// buildObjectKey joins the configured prefix and a filename into an S3 object key.
+// Surrounding slashes in the prefix are ignored; an empty prefix places the object
+// at the root of the bucket.
+func buildObjectKey(prefix, filename string) string {
+	prefix = strings.Trim(strings.TrimSpace(prefix), "/")
+	if prefix == "" {
+		return filename
+	}
+	return prefix + "/" + filename
+}
+
 // uploadToS3 uploads a backup file to S3 with one retry on failure
 func (b *PostgresBackup) uploadToS3(localPath string) error {
-	// Generate S3 key: backups/{database}-backup-{timestamp}.sql.gz
+	// Generate S3 key: {prefix}/{database}-backup-{timestamp}.sql.gz
 	filename := filepath.Base(localPath)
-	s3Key := fmt.Sprintf("backups/%s", filename)
+	s3Key := buildObjectKey(b.cfg.S3.Prefix, filename)
 
 	ctx := context.Background()
 

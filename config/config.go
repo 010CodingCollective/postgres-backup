@@ -21,6 +21,7 @@ type S3Config struct {
 	SecretAccessKey string `koanf:"secret_access_key" yaml:"secret_access_key"` // Secret access key
 	UsePathStyle    bool   `koanf:"use_path_style" yaml:"use_path_style"`       // Set to true for most S3-compatible services (MinIO, etc.)
 	StorageClass    string `koanf:"storage_class" yaml:"storage_class"`         // Storage class for uploaded objects (e.g. "GLACIER"); empty uses the provider default
+	Prefix          string `koanf:"prefix" yaml:"prefix"`                       // Key prefix for uploaded backups; empty places them at the root of the bucket
 }
 
 // Config holds all configuration for the pg-backup application
@@ -52,6 +53,7 @@ func LoadConfig(configPath string) (*Config, error) {
 		"postgres_port":       "5432",
 		"postgres_extra_opts": "--schema=public --blobs",
 		"run_at_startup":      false,
+		"s3.prefix":           "backups",
 	}
 
 	if err := k.Load(confmap.Provider(defaults, "."), nil); err != nil {
